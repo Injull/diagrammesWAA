@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cartographie des Courses — What an Adventure</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --sand: #F2E8D9;
+    --sand-dark: #E8D5B7;
+    --terracotta: #C4622D;
+    --terracotta-light: #E07A4A;
+    --charcoal: #2C2C2C;
+    --warm-white: #FAF7F2;
+    --gold: #C9952A;
+    --gold-light: #F5C842;
+    --olive: #6B7C3F;
+    --slate: #5A6475;
+    --muted: #9A8F82;
+    --shadow: rgba(44,44,44,0.12);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--warm-white);
+    color: var(--charcoal);
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  .header {
+    background: var(--charcoal);
+    padding: 20px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 3px solid var(--terracotta);
+  }
+  .header-logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    color: var(--sand);
+    letter-spacing: 0.05em;
+  }
+  .header-logo span { color: var(--gold-light); }
+  .header-subtitle {
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+  .header-actions { display: flex; gap: 10px; }
+  .btn {
+    padding: 8px 18px;
+    border: none;
+    border-radius: 4px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-primary { background: var(--terracotta); color: white; }
+  .btn-primary:hover { background: var(--terracotta-light); }
+  .btn-secondary { background: transparent; color: var(--sand); border: 1px solid var(--slate); }
+  .btn-secondary:hover { border-color: var(--sand); }
+  .btn-ghost { background: transparent; color: var(--muted); border: 1px solid #444; font-size: 12px; }
+  .btn-ghost:hover { color: white; border-color: #888; }
+
+  /* NAV TABS */
+  .nav-tabs {
+    background: var(--sand);
+    padding: 0 40px;
+    display: flex;
+    gap: 0;
+    border-bottom: 2px solid var(--sand-dark);
+  }
+  .tab {
+    padding: 14px 28px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.2s;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+  .tab:hover { color: var(--charcoal); }
+  .tab.active {
+    color: var(--terracotta);
+    border-bottom-color: var(--terracotta);
+    font-weight: 600;
+  }
+  .tab-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    background: var(--terracotta);
+    color: white;
+    border-radius: 50%;
+    font-size: 11px;
+    margin-right: 8px;
+  }
+  .tab.active .tab-number { background: var(--terracotta); }
+  .tab:not(.active) .tab-number { background: var(--muted); }
+
+  /* MAIN LAYOUT */
+  .main {
+    display: flex;
+    height: calc(100vh - 115px);
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 320px;
+    min-width: 320px;
+    background: white;
+    border-right: 1px solid var(--sand-dark);
+    overflow-y: auto;
+    padding: 24px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .sidebar-section { display: flex; flex-direction: column; gap: 10px; }
+  .sidebar-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 14px;
+    color: var(--charcoal);
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--sand-dark);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .sidebar-title-icon { font-size: 16px; }
+
+  .axis-selector { display: flex; flex-direction: column; gap: 8px; }
+  .axis-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .axis-arrow { font-size: 14px; }
+  select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--sand-dark);
+    border-radius: 6px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    color: var(--charcoal);
+    background: var(--warm-white);
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239A8F82' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+  }
+  select:focus { outline: none; border-color: var(--terracotta); }
+
+  /* LEGEND */
+  .legend-grid { display: flex; flex-direction: column; gap: 6px; }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    border: 1px solid transparent;
+  }
+  .legend-item:hover { background: var(--sand); }
+  .legend-item.highlighted { background: var(--sand); border-color: var(--sand-dark); }
+  .legend-item.dimmed { opacity: 0.35; }
+  .legend-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    border: 2px solid rgba(0,0,0,0.1);
+  }
+  .legend-text { font-size: 12px; font-weight: 500; flex: 1; }
+  .legend-tag {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    background: var(--sand-dark);
+    color: var(--muted);
+  }
+
+  /* RISK BADGE */
+  .risk-badge {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .risk-high { background: #FEF3F0; border-left: 3px solid #E05C3A; color: #7A2C10; }
+  .risk-medium { background: #FFF8E6; border-left: 3px solid var(--gold); color: #6B4A00; }
+  .risk-low { background: #F0F7EC; border-left: 3px solid var(--olive); color: #2E4A1A; }
+  .risk-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+
+  /* CANVAS AREA */
+  .canvas-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .chart-header {
+    padding: 20px 32px 12px;
+    background: var(--warm-white);
+  }
+  .chart-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px;
+    color: var(--charcoal);
+  }
+  .chart-desc {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .chart-container {
+    flex: 1;
+    padding: 10px 24px 20px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  #chart-svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* SVG styles */
+  .axis-line { stroke: var(--sand-dark); stroke-width: 1.5; }
+  .axis-arrow-head { fill: var(--terracotta); }
+  .axis-text {
+    font-family: 'DM Sans', sans-serif;
+    fill: var(--terracotta);
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .grid-line { stroke: var(--sand-dark); stroke-width: 0.5; stroke-dasharray: 3,4; }
+  .tick-label {
+    font-family: 'DM Sans', sans-serif;
+    fill: var(--muted);
+    font-size: 10px;
+  }
+
+  .bubble {
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+  .bubble:hover { filter: brightness(1.1); }
+  .bubble.dimmed { opacity: 0.12; }
+  .bubble.highlighted { filter: drop-shadow(0 4px 12px rgba(0,0,0,0.25)); }
+
+  .bubble-label {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    pointer-events: none;
+    dominant-baseline: middle;
+  }
+
+  /* TOOLTIP */
+  .tooltip {
+    position: absolute;
+    background: white;
+    border: 1px solid var(--sand-dark);
+    border-radius: 10px;
+    padding: 14px 16px;
+    pointer-events: none;
+    z-index: 100;
+    min-width: 220px;
+    box-shadow: 0 8px 24px var(--shadow);
+    transition: opacity 0.15s;
+  }
+  .tooltip-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 16px;
+    margin-bottom: 8px;
+  }
+  .tooltip-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    padding: 3px 0;
+    border-bottom: 1px solid var(--sand);
+  }
+  .tooltip-row:last-child { border-bottom: none; }
+  .tooltip-key { color: var(--muted); }
+  .tooltip-val { font-weight: 600; }
+
+  /* PANEL DONNÉES */
+  .data-panel {
+    display: none;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+  }
+  .data-panel.active { display: flex; }
+
+  .data-toolbar {
+    padding: 16px 32px;
+    background: white;
+    border-bottom: 1px solid var(--sand-dark);
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+  .data-toolbar-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 18px;
+    flex: 1;
+  }
+
+  .table-wrapper { flex: 1; overflow: auto; padding: 24px 32px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead tr { background: var(--charcoal); color: white; }
+  thead th {
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 500;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+  }
+  thead th:hover { background: #3d3d3d; }
+  tbody tr { border-bottom: 1px solid var(--sand); transition: background 0.15s; }
+  tbody tr:hover { background: var(--sand); }
+  tbody td { padding: 10px 14px; }
+
+  .cell-name { font-weight: 600; }
+  .cell-color { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }
+  .editable {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 3px 6px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    color: var(--charcoal);
+    width: 100%;
+    transition: all 0.15s;
+  }
+  .editable:hover { border-color: var(--sand-dark); background: white; }
+  .editable:focus { outline: none; border-color: var(--terracotta); background: white; }
+
+  .btn-add-row {
+    margin: 12px 0;
+    padding: 8px 20px;
+    background: var(--olive);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    transition: background 0.2s;
+  }
+  .btn-add-row:hover { background: #7a9048; }
+  .btn-del {
+    background: transparent;
+    border: none;
+    color: #cc4444;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: background 0.15s;
+  }
+  .btn-del:hover { background: #fee; }
+
+  .nivel-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .nivel-1 { background: #e8f5e9; color: #2e7d32; }
+  .nivel-2 { background: #e3f2fd; color: #1565c0; }
+  .nivel-3 { background: #fff3e0; color: #e65100; }
+  .nivel-4 { background: #fce4ec; color: #880e4f; }
+
+  /* MAPPING PANELS */
+  .mapping-panel { display: none; height: 100%; }
+  .mapping-panel.active { display: flex; flex-direction: column; height: 100%; }
+
+  /* ANALYSIS PANEL */
+  .analysis-panel {
+    display: none;
+    padding: 32px;
+    overflow-y: auto;
+  }
+  .analysis-panel.active { display: block; }
+  .analysis-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
+  .analysis-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px 24px;
+    border: 1px solid var(--sand-dark);
+  }
+  .analysis-card-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 16px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .analysis-risk-list { display: flex; flex-direction: column; gap: 8px; }
+
+  /* NOTIFICATION */
+  .notif {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--charcoal);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    transform: translateY(60px);
+    opacity: 0;
+    transition: all 0.3s;
+    z-index: 999;
+    border-left: 3px solid var(--olive);
+  }
+  .notif.show { transform: translateY(0); opacity: 1; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--sand-dark); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-logo">What an <span>Adventure</span> · Cartographie des courses</div>
+    <div class="header-subtitle">Outil d'analyse stratégique — Architecture de gamme</div>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-ghost" onclick="exportData()">⬇ Exporter JSON</button>
+    <button class="btn btn-ghost" onclick="document.getElementById('importFile').click()">⬆ Importer JSON</button>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+    <button class="btn btn-secondary" onclick="resetData()">↺ Réinitialiser</button>
+    <button class="btn btn-primary" onclick="saveToLocal()">💾 Sauvegarder</button>
+  </div>
+</div>
+
+<div class="nav-tabs">
+  <div class="tab active" onclick="switchTab('mapping1')" id="tab-mapping1">
+    <span class="tab-number">1</span>Positionnement Commercial
+  </div>
+  <div class="tab" onclick="switchTab('mapping2')" id="tab-mapping2">
+    <span class="tab-number">2</span>Positionnement Expérientiel
+  </div>
+  <div class="tab" onclick="switchTab('mapping3')" id="tab-mapping3">
+    <span class="tab-number">3</span>Engagement Physique vs Autonomie
+  </div>
+  <div class="tab" onclick="switchTab('data')" id="tab-data">
+    <span class="tab-number" style="background:#6B7C3F">✎</span>Données
+  </div>
+  <div class="tab" onclick="switchTab('analysis')" id="tab-analysis">
+    <span class="tab-number" style="background:#C9952A">!</span>Risques de cannibalisation
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- SIDEBAR (shared) -->
+  <div class="sidebar" id="sidebar">
+
+    <div class="sidebar-section">
+      <div class="sidebar-title"><span class="sidebar-title-icon">⚙</span> Options du mapping</div>
+      <div id="mapping-options">
+        <!-- dynamic per tab -->
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-title"><span class="sidebar-title-icon">◉</span> Courses</div>
+      <div class="legend-grid" id="legend-grid"></div>
+    </div>
+
+
+
+  </div>
+
+  <!-- MAPPING PANELS -->
+  <div id="panel-mapping1" class="mapping-panel active canvas-area">
+    <div class="chart-header">
+      <div class="chart-title">Positionnement Commercial</div>
+      <div class="chart-desc">Prix vs Niveau de difficulté — taille = durée (jours) ou distance (km)</div>
+    </div>
+    <div class="chart-container" id="container-mapping1">
+      <svg id="svg-mapping1"></svg>
+    </div>
+  </div>
+
+  <div id="panel-mapping2" class="mapping-panel canvas-area">
+    <div class="chart-header">
+      <div class="chart-title">Positionnement Expérientiel</div>
+      <div class="chart-desc">Individuel/Solo ↔ Collectif — Performance ↔ Lifestyle/Bien-être</div>
+    </div>
+    <div class="chart-container" id="container-mapping2">
+      <svg id="svg-mapping2"></svg>
+    </div>
+  </div>
+
+  <div id="panel-mapping3" class="mapping-panel canvas-area">
+    <div class="chart-header">
+      <div class="chart-title">Engagement Physique vs Autonomie</div>
+      <div class="chart-desc">Niveau de difficulté ↔ Degré d'autonomie/autosuffisance — taille = prix</div>
+    </div>
+    <div class="chart-container" id="container-mapping3">
+      <svg id="svg-mapping3"></svg>
+    </div>
+  </div>
+
+  <!-- DATA PANEL -->
+  <div id="panel-data" class="data-panel" style="flex:1; overflow:hidden;">
+    <div class="data-toolbar">
+      <div class="data-toolbar-title">Données des courses</div>
+      <button class="btn btn-primary" onclick="addCourse()">+ Ajouter une course</button>
+    </div>
+    <div class="table-wrapper">
+      <table id="data-table">
+        <thead>
+          <tr>
+            <th>Couleur</th>
+            <th>Nom de la course</th>
+            <th>Prix (€)</th>
+            <th>Niveau (1-4)</th>
+            <th>Jours</th>
+            <th>Km</th>
+            <th>Participants</th>
+            <th title="1=solo, 4=très collectif">Social (1-4)</th>
+            <th title="1=compétition, 4=lifestyle">Lifestyle (1-4)</th>
+            <th title="1=pension complète, 4=autosuffisance totale">Autonomie (1-4)</th>
+            <th>Univers</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="data-tbody"></tbody>
+      </table>
+      <button class="btn-add-row" onclick="addCourse()">+ Ajouter une course</button>
+    </div>
+  </div>
+
+  <!-- ANALYSIS PANEL -->
+  <div id="panel-analysis" class="analysis-panel" style="flex:1;">
+    <div style="font-family:'Playfair Display',serif; font-size:26px; margin-bottom:6px;">Analyse des risques de cannibalisation</div>
+    <div style="color:var(--muted); font-size:13px;">Courses dont le positionnement se chevauche sur au moins 2 mappings</div>
+    <div id="analysis-content"></div>
+  </div>
+
+</div>
+
+<!-- TOOLTIP -->
+<div class="tooltip" id="tooltip" style="display:none;"></div>
+
+<!-- NOTIFICATION -->
+<div class="notif" id="notif"></div>
+
+<script>
+// =====================================================
+// DATA
+// =====================================================
+const DEFAULT_COURSES = [
+  { id:"legendary", nom:"MDS Legendary", couleur:"#E8942A", niveau:3, prix:4195, jours:11, km:250, participants:1050, social:2, lifestyle:1, exclusivite:3, depaysement:4, competitif:4, autonomie:4, univers:"desert", categorie:"Pilier" },
+  { id:"mds120", nom:"MDS 120", couleur:"#F5C842", niveau:2, prix:2425, jours:8, km:100, participants:500, social:2, lifestyle:2, exclusivite:2, depaysement:4, competitif:3, autonomie:4, univers:"desert", categorie:"Porte d'entrée" },
+  { id:"handi", nom:"MDS Handi", couleur:"#8B4513", niveau:2, prix:2150, jours:7, km:70, participants:100, social:4, lifestyle:3, exclusivite:3, depaysement:4, competitif:2, autonomie:3, univers:"desert", categorie:"Image RSE" },
+  { id:"trek", nom:"MDS Trek", couleur:"#D4722A", niveau:1, prix:2350, jours:10, km:95, participants:500, social:3, lifestyle:4, exclusivite:2, depaysement:4, competitif:1, autonomie:1, univers:"desert", categorie:"Bien-être" },
+  { id:"raid", nom:"MDS Raid", couleur:"#A0522D", niveau:2, prix:2650, jours:8, km:100, participants:250, social:3, lifestyle:2, exclusivite:3, depaysement:4, competitif:3, autonomie:4, univers:"desert", categorie:"Aventure Duo" },
+  { id:"ultra", nom:"MDS Ultra", couleur:"#6B3020", niveau:3, prix:1950, jours:6, km:130, participants:200, social:1, lifestyle:1, exclusivite:3, depaysement:4, competitif:4, autonomie:4, univers:"desert", categorie:"Performance Extrême" },
+  { id:"elles", nom:"MDS Elles Marchent", couleur:"#D4649A", niveau:1, prix:3000, jours:8, km:100, participants:550, social:4, lifestyle:4, exclusivite:2, depaysement:4, competitif:1, autonomie:1, univers:"desert", categorie:"Féminin" },
+  { id:"nomad", nom:"MDS Nomad", couleur:"#C4A35A", niveau:2, prix:1000, jours:4, km:52, participants:150, social:2, lifestyle:3, exclusivite:1, depaysement:4, competitif:2, autonomie:4, univers:"desert", categorie:"Entrée Prix" },
+  { id:"charity", nom:"MDS Désert Charity", couleur:"#B8860B", niveau:1, prix:5000, jours:5, km:15, participants:40, social:4, lifestyle:4, exclusivite:4, depaysement:4, competitif:1, autonomie:1, univers:"desert", categorie:"Corporate Premium" },
+  { id:"ultim8", nom:"MDS Ultim'8", couleur:"#1E1E1E", niveau:4, prix:8000, jours:11, km:800, participants:175, social:1, lifestyle:1, exclusivite:4, depaysement:4, competitif:4, autonomie:2, univers:"desert", categorie:"Vitrine Élite" },
+  { id:"training", nom:"MDS Training Camp", couleur:"#6B7C3F", niveau:1, prix:1200, jours:7, km:0, participants:40, social:3, lifestyle:3, exclusivite:2, depaysement:4, competitif:1, autonomie:2, univers:"desert", categorie:"Recrutement" },
+  { id:"crazyloops", nom:"MDS Crazy Loops", couleur:"#2E7DBF", niveau:2, prix:82, jours:3, km:30, participants:800, social:4, lifestyle:4, exclusivite:1, depaysement:1, competitif:2, autonomie:3, univers:"montagne", categorie:"Mass Market" }
+];
+
+let courses = [];
+let highlighted = null;
+let currentTab = 'mapping1';
+
+// Bubble size config per mapping
+let bubbleSizeVar = { mapping1: 'jours', mapping2: 'participants', mapping3: 'prix' };
+
+// =====================================================
+// LOCAL STORAGE
+// =====================================================
+function loadFromLocal() {
+  const stored = localStorage.getItem('waa_courses_v3');
+  if (stored) {
+    try { courses = JSON.parse(stored); return; } catch(e) {}
+  }
+  courses = JSON.parse(JSON.stringify(DEFAULT_COURSES));
+}
+
+function saveToLocal() {
+  localStorage.setItem('waa_courses_v3', JSON.stringify(courses));
+  showNotif('✓ Données sauvegardées');
+}
+
+function resetData() {
+  if (confirm('Réinitialiser toutes les données aux valeurs par défaut ?')) {
+    courses = JSON.parse(JSON.stringify(DEFAULT_COURSES));
+    saveToLocal();
+    render();
+    showNotif('↺ Données réinitialisées');
+  }
+}
+
+function exportData() {
+  const blob = new Blob([JSON.stringify(courses, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'waa_courses_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  showNotif('⬇ Fichier exporté');
+}
+
+function importData(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      courses = JSON.parse(ev.target.result);
+      saveToLocal();
+      render();
+      showNotif('⬆ Données importées (' + courses.length + ' courses)');
+    } catch(err) { alert('Fichier JSON invalide'); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+// =====================================================
+// UI
+// =====================================================
+function showNotif(msg) {
+  const n = document.getElementById('notif');
+  n.textContent = msg;
+  n.classList.add('show');
+  setTimeout(() => n.classList.remove('show'), 2500);
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+
+  document.querySelectorAll('.mapping-panel, .data-panel, .analysis-panel').forEach(p => {
+    p.classList.remove('active');
+    p.style.display = 'none';
+  });
+
+  const sidebar = document.getElementById('sidebar');
+  if (tab === 'data') {
+    document.getElementById('panel-data').style.display = 'flex';
+    document.getElementById('panel-data').classList.add('active');
+    sidebar.style.display = 'none';
+    renderTable();
+  } else if (tab === 'analysis') {
+    document.getElementById('panel-analysis').style.display = 'block';
+    document.getElementById('panel-analysis').classList.add('active');
+    sidebar.style.display = 'none';
+    renderAnalysis();
+  } else {
+    const panel = document.getElementById('panel-' + tab);
+    panel.style.display = 'flex';
+    panel.classList.add('active');
+    sidebar.style.display = 'flex';
+    renderSidebar(tab);
+    renderChart(tab);
+  }
+}
+
+function renderSidebar(tab) {
+  renderMappingOptions(tab);
+  renderLegend();
+}
+
+function renderMappingOptions(tab) {
+  const el = document.getElementById('mapping-options');
+  if (tab === 'mapping1') {
+    el.innerHTML = `
+      <div class="axis-selector">
+        <div class="axis-label"><span class="axis-arrow">↔</span> Axe X</div>
+        <select onchange="setAxisX1(this.value)">
+          <option value="niveau" selected>Niveau de difficulté</option>
+          <option value="km">Distance (km)</option>
+          <option value="jours">Durée (jours)</option>
+        </select>
+      </div>
+      <div class="axis-selector" style="margin-top:10px">
+        <div class="axis-label"><span class="axis-arrow">↕</span> Axe Y</div>
+        <select onchange="setAxisY1(this.value)">
+          <option value="prix" selected>Prix (€)</option>
+          <option value="exclusivite">Exclusivité (1-4)</option>
+          <option value="participants">Nb participants</option>
+        </select>
+      </div>
+      <div class="axis-selector" style="margin-top:10px">
+        <div class="axis-label">⬤ Taille des bulles</div>
+        <select onchange="setBubbleSize('mapping1',this.value)">
+          <option value="jours" ${bubbleSizeVar.mapping1==='jours'?'selected':''}>Durée (jours)</option>
+          <option value="km" ${bubbleSizeVar.mapping1==='km'?'selected':''}>Distance (km)</option>
+          <option value="participants" ${bubbleSizeVar.mapping1==='participants'?'selected':''}>Nb participants</option>
+        </select>
+      </div>`;
+  } else if (tab === 'mapping2') {
+    el.innerHTML = `
+      <div style="font-size:12px; color:var(--muted); line-height:1.6; background:var(--sand); padding:10px; border-radius:6px;">
+        Ce mapping explore la <strong>promesse émotionnelle</strong> de chaque format.<br><br>
+        ← Individuel/Solo ↔ Collectif/Social →<br>
+        ↑ Lifestyle/Bien-être ↔ Performance ↓
+      </div>
+      <div class="axis-selector" style="margin-top:12px">
+        <div class="axis-label">⬤ Taille des bulles</div>
+        <select onchange="setBubbleSize('mapping2',this.value)">
+          <option value="participants" ${bubbleSizeVar.mapping2==='participants'?'selected':''}>Nb participants</option>
+          <option value="prix" ${bubbleSizeVar.mapping2==='prix'?'selected':''}>Prix (€)</option>
+          <option value="jours" ${bubbleSizeVar.mapping2==='jours'?'selected':''}>Durée (jours)</option>
+        </select>
+      </div>`;
+  } else if (tab === 'mapping3') {
+    el.innerHTML = `
+      <div style="font-size:12px; color:var(--muted); line-height:1.6; background:var(--sand); padding:10px; border-radius:6px;">
+        Ce mapping révèle la <strong>nature de l'effort demandé</strong>.<br><br>
+        ← Assisté/Encadré ↔ Autonome/Autosuffisant →<br>
+        ↑ Accessible/Facile ↔ Exigeant/Intense ↓<br><br>
+        <em>Autonomie (1-4) :</em> 1 = pension complète, 4 = autosuffisance totale
+      </div>
+      <div class="axis-selector" style="margin-top:12px">
+        <div class="axis-label">⬤ Taille des bulles</div>
+        <select onchange="setBubbleSize('mapping3',this.value)">
+          <option value="prix" ${bubbleSizeVar.mapping3==='prix'?'selected':''}>Prix (€)</option>
+          <option value="participants" ${bubbleSizeVar.mapping3==='participants'?'selected':''}>Nb participants</option>
+          <option value="jours" ${bubbleSizeVar.mapping3==='jours'?'selected':''}>Durée (jours)</option>
+          <option value="km" ${bubbleSizeVar.mapping3==='km'?'selected':''}>Distance (km)</option>
+        </select>
+      </div>`;
+  }
+}
+
+// Axis vars for mapping1 (configurable)
+let axisX1 = 'niveau', axisY1 = 'prix';
+function setAxisX1(v) { axisX1 = v; renderChart('mapping1'); }
+function setAxisY1(v) { axisY1 = v; renderChart('mapping1'); }
+function setBubbleSize(mapping, v) { bubbleSizeVar[mapping] = v; renderChart(mapping); }
+
+function renderLegend() {
+  const el = document.getElementById('legend-grid');
+  el.innerHTML = courses.map(c => `
+    <div class="legend-item ${highlighted===c.id?'highlighted':highlighted?'dimmed':''}"
+         onclick="toggleHighlight('${c.id}')" id="leg-${c.id}">
+      <div class="legend-dot" style="background:${c.couleur}"></div>
+      <div class="legend-text">${c.nom}</div>
+      <div class="legend-tag">${c.categorie||''}</div>
+    </div>`).join('');
+}
+
+function renderRisks() {
+  const risks = computeRisks();
+  const el = document.getElementById('risk-alerts');
+  if (!risks.length) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--muted)">Aucun risque détecté</div>';
+    return;
+  }
+  el.innerHTML = risks.slice(0,4).map(r => `
+    <div class="risk-badge ${r.level}" style="margin-bottom:6px">
+      <span class="risk-icon">${r.level==='risk-high'?'🔴':r.level==='risk-medium'?'🟡':'🟢'}</span>
+      <span><strong>${r.pair}</strong><br>${r.reason}</span>
+    </div>`).join('');
+}
+
+function toggleHighlight(id) {
+  highlighted = highlighted === id ? null : id;
+  renderLegend();
+  ['mapping1','mapping2','mapping3'].forEach(m => {
+    if (document.getElementById('panel-'+m).classList.contains('active')) renderChart(m);
+  });
+}
+
+// =====================================================
+// CHART RENDERING
+// =====================================================
+function getAxesConfig(tab) {
+  if (tab === 'mapping1') {
+    return {
+      xKey: axisX1, yKey: axisY1,
+      xLabel: { niveau:'NIVEAU DE DIFFICULTÉ', km:'DISTANCE (KM)', jours:'DURÉE (JOURS)' }[axisX1],
+      yLabel: { prix:'NIVEAU DE PRIX', exclusivite:'EXCLUSIVITÉ', participants:'NB PARTICIPANTS' }[axisY1],
+      xDomain: null, yDomain: null
+    };
+  }
+  if (tab === 'mapping2') {
+    return { xKey:'social', yKey:'lifestyle', xLabel:'COLLECTIF / SOCIAL', yLabel:'LIFESTYLE / BIEN-ÊTRE', xDomain:[1,4], yDomain:[1,4] };
+  }
+  if (tab === 'mapping3') {
+    return { xKey:'autonomie', yKey:'niveau', xLabel:'AUTONOMIE / AUTOSUFFISANCE', yLabel:'NIVEAU DE DIFFICULTÉ', xDomain:[1,4], yDomain:[1,4] };
+  }
+}
+
+function renderChart(tab) {
+  const svgEl = document.getElementById('svg-' + tab);
+  const container = document.getElementById('container-' + tab);
+  if (!svgEl || !container) return;
+
+  const W = container.clientWidth || 800;
+  const H = container.clientHeight || 500;
+  const mg = { top: 40, right: 60, bottom: 70, left: 80 };
+  const iW = W - mg.left - mg.right;
+  const iH = H - mg.top - mg.bottom;
+
+  const cfg = getAxesConfig(tab);
+  const sizeKey = bubbleSizeVar[tab];
+
+  // Clear
+  d3.select(svgEl).selectAll('*').remove();
+  const svg = d3.select(svgEl)
+    .attr('viewBox', `0 0 ${W} ${H}`)
+    .attr('preserveAspectRatio', 'xMidYMid meet');
+
+  const g = svg.append('g').attr('transform', `translate(${mg.left},${mg.top})`);
+
+  // Scales
+  const vals_x = courses.map(c => +c[cfg.xKey]).filter(v => !isNaN(v));
+  const vals_y = courses.map(c => +c[cfg.yKey]).filter(v => !isNaN(v));
+  const xDom = cfg.xDomain || [Math.min(...vals_x) * 0.9, Math.max(...vals_x) * 1.05];
+  const yDom = cfg.yDomain || [Math.min(...vals_y) * 0.8, Math.max(...vals_y) * 1.08];
+
+  const xScale = d3.scaleLinear().domain(xDom).range([0, iW]);
+  const yScale = d3.scaleLinear().domain(yDom).range([iH, 0]);
+
+  // Bubble size scale
+  const svals = courses.map(c => +c[sizeKey]||1).filter(v=>v>0);
+  const rScale = d3.scaleSqrt().domain([0, Math.max(...svals)]).range([8, 42]);
+
+  // Grid lines
+  const xTicks = xScale.ticks(5);
+  const yTicks = yScale.ticks(5);
+  xTicks.forEach(v => {
+    g.append('line').attr('class','grid-line')
+      .attr('x1', xScale(v)).attr('y1', 0).attr('x2', xScale(v)).attr('y2', iH);
+  });
+  yTicks.forEach(v => {
+    g.append('line').attr('class','grid-line')
+      .attr('x1', 0).attr('y1', yScale(v)).attr('x2', iW).attr('y2', yScale(v));
+  });
+
+  // Quadrant backgrounds for mappings 2 & 3
+  if (tab === 'mapping2' || tab === 'mapping3') {
+    const midX = xScale(2.5), midY = yScale(2.5);
+    const quadColors = ['rgba(242,232,217,0.3)','rgba(200,230,200,0.3)','rgba(230,200,200,0.3)','rgba(200,210,240,0.3)'];
+    const quads = [
+      {x:0,y:0,w:midX,h:midY},
+      {x:midX,y:0,w:iW-midX,h:midY},
+      {x:0,y:midY,w:midX,h:iH-midY},
+      {x:midX,y:midY,w:iW-midX,h:iH-midY}
+    ];
+    quads.forEach((q,i) => {
+      g.append('rect').attr('x',q.x).attr('y',q.y).attr('width',q.w).attr('height',q.h)
+        .attr('fill',quadColors[i]).attr('stroke','none');
+    });
+    // Center lines
+    g.append('line').attr('x1',midX).attr('y1',0).attr('x2',midX).attr('y2',iH)
+      .attr('stroke','var(--terracotta)').attr('stroke-width',1).attr('stroke-dasharray','4,3').attr('opacity',0.5);
+    g.append('line').attr('x1',0).attr('y1',midY).attr('x2',iW).attr('y2',midY)
+      .attr('stroke','var(--terracotta)').attr('stroke-width',1).attr('stroke-dasharray','4,3').attr('opacity',0.5);
+  }
+
+  // Axes
+  g.append('line').attr('class','axis-line')
+    .attr('x1',0).attr('y1',iH).attr('x2',iW+20).attr('y2',iH);
+  g.append('line').attr('class','axis-line')
+    .attr('x1',0).attr('y1',0).attr('x2',0).attr('y2',iH+10);
+  // Arrows
+  g.append('polygon').attr('class','axis-arrow-head')
+    .attr('points',`${iW+20},${iH-5} ${iW+32},${iH} ${iW+20},${iH+5}`);
+  g.append('polygon').attr('class','axis-arrow-head')
+    .attr('points',`${-5},0 ${0},-12 ${5},0`);
+
+  // Tick labels
+  xTicks.forEach(v => {
+    const label = cfg.xKey === 'prix' ? v.toLocaleString('fr')+'€' : v;
+    g.append('text').attr('class','tick-label').attr('x',xScale(v)).attr('y',iH+18)
+      .attr('text-anchor','middle').text(label);
+  });
+  yTicks.forEach(v => {
+    const label = cfg.yKey === 'prix' ? v.toLocaleString('fr')+'€' : v;
+    g.append('text').attr('class','tick-label').attr('x',-12).attr('y',yScale(v))
+      .attr('text-anchor','end').attr('dominant-baseline','middle').text(label);
+  });
+
+  // Axis labels
+  g.append('text').attr('class','axis-text')
+    .attr('x', iW/2).attr('y', iH+52).attr('text-anchor','middle').text(cfg.xLabel);
+  g.append('text').attr('class','axis-text')
+    .attr('transform',`translate(-56,${iH/2}) rotate(-90)`)
+    .attr('text-anchor','middle').text(cfg.yLabel);
+
+  // Quadrant labels for mapping2/3
+  if (tab === 'mapping2') {
+    const ql = [
+      {x:iW*0.18, y:20, t:'Performance Solo'},
+      {x:iW*0.75, y:20, t:'Performance Collective'},
+      {x:iW*0.18, y:iH-10, t:'Lifestyle Individuel'},
+      {x:iW*0.75, y:iH-10, t:'Lifestyle Social'}
+    ];
+    ql.forEach(q => g.append('text').attr('x',q.x).attr('y',q.y).attr('text-anchor','middle')
+      .attr('fill','var(--muted)').attr('font-size','10px').attr('font-family','DM Sans').attr('opacity',0.7).text(q.t));
+  }
+  if (tab === 'mapping3') {
+    const ql = [
+      {x:iW*0.2, y:20, t:'Assisté & Intense'},
+      {x:iW*0.8, y:20, t:'Autonome & Intense'},
+      {x:iW*0.2, y:iH-10, t:'Assisté & Accessible'},
+      {x:iW*0.8, y:iH-10, t:'Autonome & Accessible'}
+    ];
+    ql.forEach(q => g.append('text').attr('x',q.x).attr('y',q.y).attr('text-anchor','middle')
+      .attr('fill','var(--muted)').attr('font-size','10px').attr('font-family','DM Sans').attr('opacity',0.7).text(q.t));
+  }
+
+  // Legend: bubble size
+  const legendBubble = g.append('g').attr('transform',`translate(${iW-10},${iH-10})`);
+  legendBubble.append('text').attr('x',0).attr('y',0).attr('text-anchor','end')
+    .attr('fill','var(--muted)').attr('font-size','9px').attr('font-family','DM Sans')
+    .text('⬤ taille = ' + ({ jours:'durée (jours)', km:'distance (km)', participants:'nb participants', prix:'prix (€)' }[sizeKey]||sizeKey));
+
+  // Sort courses: largest bubbles first (so small bubbles visible on top)
+  const sorted = [...courses].sort((a,b) => (+b[sizeKey]||1) - (+a[sizeKey]||1));
+
+  sorted.forEach(c => {
+    const xv = +c[cfg.xKey];
+    const yv = +c[cfg.yKey];
+    if (isNaN(xv) || isNaN(yv)) return;
+
+    const cx = xScale(xv);
+    const cy = yScale(yv);
+    const r = rScale(+c[sizeKey]||1);
+    const isDimmed = highlighted && highlighted !== c.id;
+    const isHL = highlighted === c.id;
+
+    const bg = g.append('circle')
+      .attr('cx', cx).attr('cy', cy).attr('r', r+3)
+      .attr('fill', 'white').attr('opacity', isDimmed ? 0.05 : 0.4);
+
+    const circle = g.append('circle')
+      .attr('class', 'bubble')
+      .attr('cx', cx).attr('cy', cy).attr('r', r)
+      .attr('fill', c.couleur)
+      .attr('stroke', isHL ? '#fff' : 'rgba(255,255,255,0.5)')
+      .attr('stroke-width', isHL ? 2.5 : 1)
+      .attr('opacity', isDimmed ? 0.1 : 0.88)
+      .attr('filter', isHL ? 'drop-shadow(0 3px 10px rgba(0,0,0,0.3))' : null);
+
+    // Label
+    const shortName = c.nom.replace('MDS ','').replace('Désert Charity','Charity').replace("Elles Marchent","Elles M.");
+    const needsWhite = ['#1E1E1E','#6B3020','#8B4513','#A0522D'].includes(c.couleur);
+    g.append('text')
+      .attr('class','bubble-label')
+      .attr('x', cx).attr('y', cy)
+      .attr('text-anchor','middle')
+      .attr('fill', needsWhite ? '#fff' : '#fff')
+      .attr('font-size', r < 16 ? '9px' : r < 22 ? '10px' : '11px')
+      .attr('opacity', isDimmed ? 0.1 : 1)
+      .attr('pointer-events','none')
+      .text(shortName);
+
+    // Interactions
+    circle.on('mousemove', (event) => showTooltip(event, c, sizeKey))
+          .on('mouseleave', hideTooltip)
+          .on('click', () => { toggleHighlight(c.id); });
+  });
+}
+
+function showTooltip(event, c, sizeKey) {
+  const t = document.getElementById('tooltip');
+  const sizeLabel = { jours:'Durée', km:'Distance', participants:'Participants', prix:'Prix' }[sizeKey]||sizeKey;
+  const niveauLabel = ['','🟢 Vert','🔵 Bleu','🔴 Rouge','⚫ Noir'][c.niveau]||c.niveau;
+  t.innerHTML = `
+    <div class="tooltip-name" style="color:${c.couleur}">${c.nom}</div>
+    <div class="tooltip-row"><span class="tooltip-key">Catégorie</span><span class="tooltip-val">${c.categorie}</span></div>
+    <div class="tooltip-row"><span class="tooltip-key">Prix</span><span class="tooltip-val">${(+c.prix).toLocaleString('fr')} €</span></div>
+    <div class="tooltip-row"><span class="tooltip-key">Niveau</span><span class="tooltip-val">${niveauLabel}</span></div>
+    <div class="tooltip-row"><span class="tooltip-key">Durée</span><span class="tooltip-val">${c.jours} jours</span></div>
+    <div class="tooltip-row"><span class="tooltip-key">Distance</span><span class="tooltip-val">${c.km > 0 ? c.km+' km' : 'Stage'}</span></div>
+    <div class="tooltip-row"><span class="tooltip-key">Participants</span><span class="tooltip-val">~${(+c.participants).toLocaleString('fr')}</span></div>
+    <div class="tooltip-row"><span class="tooltip-key">Social (1-4)</span><span class="tooltip-val">${c.social}</span></div>
+    <div class="tooltip-row"><span class="tooltip-key">Lifestyle (1-4)</span><span class="tooltip-val">${c.lifestyle}</span></div>
+  `;
+  t.style.display = 'block';
+  const rect = document.querySelector('.canvas-area.active').getBoundingClientRect();
+  let tx = event.clientX - rect.left + 14;
+  let ty = event.clientY - rect.top - 10;
+  if (tx + 240 > rect.width) tx -= 255;
+  if (ty + 220 > rect.height) ty -= 230;
+  t.style.left = tx + 'px';
+  t.style.top = ty + 'px';
+}
+function hideTooltip() { document.getElementById('tooltip').style.display='none'; }
+
+// =====================================================
+// DATA TABLE
+// =====================================================
+function renderTable() {
+  const tbody = document.getElementById('data-tbody');
+  tbody.innerHTML = courses.map((c,i) => `
+    <tr>
+      <td><input type="color" value="${c.couleur}" style="width:32px;height:24px;border:none;cursor:pointer;background:none" onchange="updateCourse(${i},'couleur',this.value)"></td>
+      <td class="cell-name"><input class="editable" value="${c.nom}" onchange="updateCourse(${i},'nom',this.value)" style="min-width:160px"></td>
+      <td><input class="editable" type="number" value="${c.prix}" onchange="updateCourse(${i},'prix',+this.value)" style="width:80px"></td>
+      <td>
+        <select class="editable" onchange="updateCourse(${i},'niveau',+this.value)" style="width:100px">
+          <option value="1" ${c.niveau==1?'selected':''}>🟢 Vert</option>
+          <option value="2" ${c.niveau==2?'selected':''}>🔵 Bleu</option>
+          <option value="3" ${c.niveau==3?'selected':''}>🔴 Rouge</option>
+          <option value="4" ${c.niveau==4?'selected':''}>⚫ Noir</option>
+        </select>
+      </td>
+      <td><input class="editable" type="number" value="${c.jours}" onchange="updateCourse(${i},'jours',+this.value)" style="width:60px"></td>
+      <td><input class="editable" type="number" value="${c.km}" onchange="updateCourse(${i},'km',+this.value)" style="width:60px"></td>
+      <td><input class="editable" type="number" value="${c.participants}" onchange="updateCourse(${i},'participants',+this.value)" style="width:80px"></td>
+      <td><input class="editable" type="number" min="1" max="4" value="${c.social}" onchange="updateCourse(${i},'social',+this.value)" style="width:55px"></td>
+      <td><input class="editable" type="number" min="1" max="4" value="${c.lifestyle}" onchange="updateCourse(${i},'lifestyle',+this.value)" style="width:55px"></td>
+      <td><input class="editable" type="number" min="1" max="4" value="${c.autonomie||2}" onchange="updateCourse(${i},'autonomie',+this.value)" style="width:55px"></td>
+      <td>
+        <select class="editable" onchange="updateCourse(${i},'univers',this.value)" style="width:90px">
+          <option value="desert" ${c.univers==='desert'?'selected':''}>Désert</option>
+          <option value="montagne" ${c.univers==='montagne'?'selected':''}>Montagne</option>
+          <option value="autre" ${c.univers==='autre'?'selected':''}>Autre</option>
+        </select>
+      </td>
+      <td><button class="btn-del" onclick="deleteCourse(${i})" title="Supprimer">✕</button></td>
+    </tr>`).join('');
+}
+
+function updateCourse(i, key, val) {
+  courses[i][key] = val;
+  saveToLocal();
+  showNotif('✓ Modifié : ' + courses[i].nom);
+}
+
+function addCourse() {
+  const id = 'course_' + Date.now();
+  courses.push({
+    id, nom:'Nouvelle course', couleur:'#888888', niveau:2, prix:2000, jours:7,
+    km:80, participants:200, social:2, lifestyle:2, autonomie:3,
+    competitif:2, univers:'desert', categorie:'Nouveau'
+  });
+  saveToLocal();
+  renderTable();
+  showNotif('+ Nouvelle course ajoutée');
+}
+
+function deleteCourse(i) {
+  if (confirm('Supprimer "' + courses[i].nom + '" ?')) {
+    courses.splice(i, 1);
+    saveToLocal();
+    renderTable();
+    showNotif('✓ Course supprimée');
+  }
+}
+
+// =====================================================
+// RISK ANALYSIS
+// =====================================================
+function computeRisks() {
+  const risks = [];
+  for (let i = 0; i < courses.length; i++) {
+    for (let j = i+1; j < courses.length; j++) {
+      const a = courses[i], b = courses[j];
+      let score = 0, reasons = [];
+
+      // Mapping 1: prix et niveau proches
+      const prixDiff = Math.abs(a.prix - b.prix);
+      const niveauSame = a.niveau === b.niveau;
+      if (prixDiff < 600 && niveauSame) { score += 2; reasons.push('prix et niveau similaires'); }
+      else if (prixDiff < 400) { score += 1; reasons.push('prix proches'); }
+
+      // Mapping 2: expérience similaire
+      const socialDiff = Math.abs(a.social - b.social);
+      const lifeDiff = Math.abs(a.lifestyle - b.lifestyle);
+      if (socialDiff <= 1 && lifeDiff <= 1) { score += 2; reasons.push('expérience similaire'); }
+
+      // Mapping 3: engagement physique et autonomie similaires
+      const autonDiff = Math.abs((a.autonomie||2) - (b.autonomie||2));
+      const niveauDiff = Math.abs(a.niveau - b.niveau);
+      if (autonDiff <= 1 && niveauDiff === 0) { score += 2; reasons.push('engagement physique et autonomie similaires'); }
+      else if (autonDiff === 0 && niveauDiff <= 1) { score += 1; reasons.push('profil effort proche'); }
+
+      if (score >= 4) risks.push({ pair: a.nom.replace('MDS ','')+' / '+b.nom.replace('MDS ',''), reason: reasons.join(' + '), level:'risk-high', score });
+      else if (score >= 3) risks.push({ pair: a.nom.replace('MDS ','')+' / '+b.nom.replace('MDS ',''), reason: reasons.join(' + '), level:'risk-medium', score });
+    }
+  }
+  return risks.sort((a,b) => b.score - a.score);
+}
+
+function renderAnalysis() {
+  const risks = computeRisks();
+  const high = risks.filter(r => r.level === 'risk-high');
+  const med = risks.filter(r => r.level === 'risk-medium');
+
+  document.getElementById('analysis-content').innerHTML = `
+    <div class="analysis-grid" style="margin-top:24px">
+      <div class="analysis-card">
+        <div class="analysis-card-title">🔴 Risques élevés (${high.length})</div>
+        <div class="analysis-risk-list">
+          ${high.length ? high.map(r => `
+            <div class="risk-badge risk-high">
+              <span class="risk-icon">⚠</span>
+              <div><strong>${r.pair}</strong><br><span style="font-size:11px">${r.reason}</span></div>
+            </div>`).join('') : '<div style="color:var(--muted);font-size:13px">Aucun</div>'}
+        </div>
+      </div>
+      <div class="analysis-card">
+        <div class="analysis-card-title">🟡 Risques modérés (${med.length})</div>
+        <div class="analysis-risk-list">
+          ${med.length ? med.map(r => `
+            <div class="risk-badge risk-medium">
+              <span class="risk-icon">〜</span>
+              <div><strong>${r.pair}</strong><br><span style="font-size:11px">${r.reason}</span></div>
+            </div>`).join('') : '<div style="color:var(--muted);font-size:13px">Aucun</div>'}
+        </div>
+      </div>
+    </div>
+    <div class="analysis-card" style="margin-top:20px">
+      <div class="analysis-card-title">💡 Recommandations stratégiques</div>
+      <div style="font-size:13px; line-height:1.8; color:var(--charcoal);">
+        ${generateRecommendations(high, med)}
+      </div>
+    </div>`;
+}
+
+function generateRecommendations(high, med) {
+  if (!high.length && !med.length) return '✅ Aucun risque de cannibalisation détecté — la gamme est bien différenciée sur les 3 mappings.';
+  let html = '';
+  if (high.length) {
+    html += `<p style="margin-bottom:8px"><strong>Priorité haute :</strong> Les paires suivantes nécessitent une différenciation immédiate :</p>`;
+    html += '<ul style="padding-left:20px;margin-bottom:12px">' + high.map(r =>
+      `<li><strong>${r.pair}</strong> — chevauchement sur : ${r.reason}. Envisager un repositionnement prix, une refonte du format ou une suppression de l'un des deux.</li>`
+    ).join('') + '</ul>';
+  }
+  if (med.length) {
+    html += `<p style="margin-bottom:8px"><strong>À surveiller :</strong></p>`;
+    html += '<ul style="padding-left:20px">' + med.map(r =>
+      `<li><strong>${r.pair}</strong> — ${r.reason}. Clarifier le message marketing pour accentuer les différences.</li>`
+    ).join('') + '</ul>';
+  }
+  return html;
+}
+
+// =====================================================
+// RENDER ALL
+// =====================================================
+function render() {
+  if (currentTab === 'data') { renderTable(); return; }
+  if (currentTab === 'analysis') { renderAnalysis(); return; }
+  renderSidebar(currentTab);
+  renderChart(currentTab);
+}
+
+// Resize handler
+window.addEventListener('resize', () => {
+  if (['mapping1','mapping2','mapping3'].includes(currentTab)) renderChart(currentTab);
+});
+
+// Init
+loadFromLocal();
+switchTab('mapping1');
+</script>
+</body>
+</html>
